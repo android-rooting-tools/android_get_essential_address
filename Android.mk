@@ -9,7 +9,7 @@ LOCAL_SRC_FILES := \
   mm.c \
   ptmx.c
 
-LOCAL_MODULE := run_root_shell
+LOCAL_MODULE := get_essential_address
 LOCAL_MODULE_TAGS := optional
 LOCAL_STATIC_LIBRARIES := libdevice_database
 LOCAL_STATIC_LIBRARIES += libexploit

