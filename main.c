@@ -214,9 +214,18 @@ main(int argc, char **argv)
 {
   device_detected();
 
+  printf("Try without fb_mem_exploit fist...\n\n");
+  set_fb_mem_exploit_enable(false);
+
   if (!setup_variables()) {
-    printf("Failed to setup variables.\n");
-    exit(EXIT_FAILURE);
+    printf("\n\n");
+
+    printf("Try again with fb_mem_exploit...\n\n");
+    set_fb_mem_exploit_enable(true);
+    if (!setup_variables()) {
+      printf("Failed to setup variables.\n");
+      exit(EXIT_FAILURE);
+    }
   }
 
   register_address();
