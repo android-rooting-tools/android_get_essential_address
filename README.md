@@ -10,7 +10,7 @@ To get root or unlock security, we need to know device address. Our new rooting 
 
 # For examples:
 
-Get new address for Xperia UL (SOL22) build 10.3.1.D.0.220 with another tool get\_essential\_address (android\_get\_essential\_address repository).
+Get new address for Xperia UL (SOL22) build 10.3.1.D.0.220 with get\_essential\_address.
 
       > adb push device.db /data/local/tmp
       > adb push get_essential_address /data/local/tmp
