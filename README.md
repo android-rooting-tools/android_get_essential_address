@@ -36,8 +36,8 @@ Get new address for Xperia UL (SOL22) build 10.3.1.D.0.220 with get\_essential\_
       Search address in memroy...
       Using kallsyms_in_memroy...
       Essential address are:
-	prepare_kernel_cred = 0xc00a2fe4
-	commit_creds = 0xc00a2b08
-	remap_pfn_range = 0xc011a818
-	vmalloc_exec = 0xc01274ec
-	ptmx_fops = 0xc0f48600
+        prepare_kernel_cred = 0xc00a2fe4
+        commit_creds = 0xc00a2b08
+        remap_pfn_range = 0xc011a818
+        vmalloc_exec = 0xc01274ec
+        ptmx_fops = 0xc0f48600
