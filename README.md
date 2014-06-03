@@ -1,14 +1,14 @@
 android\_get\_essential\_address
 =================
 
-To get root or unlock security, we need to know device address. Our new rooting and unlocking tools use device.db file by device\_database library (android\_device\_database repository) to store address in sqlite3 database format. This tool try to search device address and store into device.db file automatically if possible.
+To get root or unlock security, we need to know device address. Our new rooting and unlocking tools use device.db file by device\_database library (android\_device\_database repository) to store address in sqlite3 database format. This tool tries to search device address and store into device.db file automatically if possible.
 
 # How to use:
 1. Install tool get\_essential\_address into directory you want to run them on.
 2. Place device.db file to manage into tool direcytory.
 3. Move into tools directory and run tool in adb shell.
 
-# For examples:
+# For example:
 
 Get new address for Xperia UL (SOL22) build 10.3.1.D.0.220 with get\_essential\_address.
 
